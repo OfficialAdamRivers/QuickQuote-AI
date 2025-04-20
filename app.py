@@ -3,7 +3,6 @@ from fpdf import FPDF
 import os
 from datetime import datetime
 import uuid
-import base64
 
 app = Flask(__name__)
 
@@ -19,7 +18,6 @@ FORM_HTML = """
         body { font-family: Arial, sans-serif; margin: 40px; }
         input, textarea { width: 100%; padding: 8px; margin: 5px 0; }
         .item-row { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
-        canvas { border: 1px solid #ccc; width: 100%; height: 150px; }
     </style>
 </head>
 <body>
@@ -41,33 +39,23 @@ FORM_HTML = """
         </div>
         {% endfor %}
 
+        <label>Business Name:</label><input type="text" name="biz_name"><br>
+        <label>Business Address:</label><textarea name="biz_address"></textarea><br>
+        <label>Business Phone:</label><input type="text" name="biz_phone"><br>
+        <label>Business Email:</label><input type="email" name="biz_email"><br>
+        <label>Business Website:</label><input type="text" name="biz_website"><br><br>
+
         <label>Custom Header Title:</label><input type="text" name="custom_title"><br>
         <label>Footer Note:</label><textarea name="footer_note"></textarea><br>
         <label>Upload Logo (optional):</label><input type="file" name="logo"><br>
         <input type="checkbox" name="show_phone"> Include phone number<br>
-        <input type="checkbox" name="show_signature" checked> Include signature line<br>
+        <input type="checkbox" name="show_signature" checked> Include signature<br>
         <input type="checkbox" name="show_thanks" checked> Show "Thank You" message<br><br>
 
-        <label>Draw Signature Below:</label><br>
-        <canvas id="signature-pad"></canvas>
-        <input type="hidden" name="signature" id="signature">
-        <button type="button" onclick="clearPad()">Clear</button><br><br>
+        <label>Type Your Name for Signature:</label><input type="text" name="typed_signature"><br><br>
 
         <input type="submit" value="Generate Estimate">
     </form>
-    <script src="https://cdn.jsdelivr.net/npm/signature_pad@2.3.2/dist/signature_pad.min.js"></script>
-    <script>
-        const canvas = document.getElementById('signature-pad');
-        const signaturePad = new SignaturePad(canvas);
-        document.querySelector('form').addEventListener('submit', function () {
-            if (!signaturePad.isEmpty()) {
-                document.getElementById('signature').value = signaturePad.toDataURL();
-            }
-        });
-        function clearPad() {
-            signaturePad.clear();
-        }
-    </script>
 </body>
 </html>
 """
@@ -85,7 +73,13 @@ def submit():
     show_thanks = request.form.get("show_thanks")
     footer_note = request.form.get("footer_note")
     custom_title = request.form.get("custom_title") or "Estimate"
-    signature_data = request.form.get("signature")
+    typed_signature = request.form.get("typed_signature")
+
+    biz_name = request.form.get("biz_name")
+    biz_address = request.form.get("biz_address")
+    biz_phone = request.form.get("biz_phone")
+    biz_email = request.form.get("biz_email")
+    biz_website = request.form.get("biz_website")
 
     date = request.form.get("date") or datetime.now().strftime("%Y-%m-%d")
     estimate_id = str(uuid.uuid4())[:8]
@@ -122,6 +116,21 @@ def submit():
         except:
             pass
 
+    if biz_name:
+        pdf.set_font("Arial", style='B', size=12)
+        pdf.cell(200, 10, txt=biz_name, ln=True)
+    pdf.set_font("Arial", size=10)
+    if biz_address:
+        pdf.multi_cell(0, 8, txt=biz_address)
+    if biz_phone:
+        pdf.cell(200, 8, txt=f"Phone: {biz_phone}", ln=True)
+    if biz_email:
+        pdf.cell(200, 8, txt=f"Email: {biz_email}", ln=True)
+    if biz_website:
+        pdf.cell(200, 8, txt=f"Website: {biz_website}", ln=True)
+    pdf.ln(5)
+
+    pdf.set_font("Arial", style='', size=12)
     pdf.cell(200, 10, txt=f"{custom_title} #{estimate_id}", ln=True, align='C')
     pdf.cell(200, 10, txt=f"Customer: {customer}", ln=True)
     pdf.cell(200, 10, txt=f"Date: {date}", ln=True)
@@ -142,19 +151,14 @@ def submit():
         pdf.ln(10)
         pdf.multi_cell(0, 10, txt=f"Note: {footer_note}")
 
-    if show_signature and signature_data:
-        try:
-            sig_path = f"{PDF_DIR}/sig_{estimate_id}.png"
-            header, encoded = signature_data.split(',', 1)
-            with open(sig_path, 'wb') as f:
-                f.write(base64.b64decode(encoded))
-            pdf.ln(10)
-            pdf.image(sig_path, x=10, w=60)
-        except:
-            pass
+    if show_signature and typed_signature:
+        pdf.ln(15)
+        pdf.set_font("Arial", style='I', size=16)
+        pdf.cell(200, 10, txt=f"Signed: {typed_signature}", ln=True)
 
     if show_thanks:
         pdf.ln(10)
+        pdf.set_font("Arial", style='B', size=12)
         pdf.cell(200, 10, txt="Thank you for your business!", ln=True, align='C')
 
     pdf.output(filename)
