@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file, render_template_string
+from flask import Flask, request, send_file, render_template_string, redirect, url_for
 from fpdf import FPDF
 import os
 from datetime import datetime
@@ -8,8 +8,6 @@ app = Flask(__name__)
 
 PDF_DIR = "pdfs"
 os.makedirs(PDF_DIR, exist_ok=True)
-
-WHITELISTED_EMAILS = ["testuser@example.com"]
 
 FORM_HTML = """
 <!DOCTYPE html>
@@ -52,10 +50,6 @@ def index():
 
 @app.route("/submit", methods=["POST"])
 def submit():
-    email = request.form.get("email")
-    if email not in WHITELISTED_EMAILS:
-        return "Access Denied. Please subscribe to access this tool.", 403
-
     customer = request.form.get("customer")
     date = request.form.get("date") or datetime.now().strftime("%Y-%m-%d")
     estimate_id = str(uuid.uuid4())[:8]
